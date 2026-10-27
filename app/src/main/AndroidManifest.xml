@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Network permissions for loading product images and Cloudinary/Firestore -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <application
+        android:allowBackup="true"
+        android:icon="@drawable/ic_verified"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_verified"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.CampusCart"
+        tools:targetApi="31">
+
+        <!-- Main Launcher: HomeActivity -->
+        <activity
+            android:name=".activities.HomeActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustPan|adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Product Details Screen -->
+        <activity
+            android:name=".activities.ProductDetailsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustPan" />
+
+        <!-- Advanced Search and Filters Screen -->
+        <activity
+            android:name=".activities.SearchFilterActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Add Product / Sell Listing Screen -->
+        <activity
+            android:name=".activities.AddProductActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- My Listings Screen — seller's own listings management -->
+        <activity
+            android:name=".activities.MyListingsActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustPan" />
+        <activity
+            android:name=".activities.FavouritesActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustPan" />
+    </application>
+
+</manifest>

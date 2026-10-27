@@ -1,0 +1,31 @@
+<resources>
+    <string name="app_name">CampusCart</string>
+    <string name="tagline">Buy • Sell • Connect</string>
+    <string name="welcome_headline">Campus Marketplace</string>
+    <string name="welcome_subtitle">Buy and sell pre-owned items within your college</string>
+
+    <!-- Search & Filters -->
+    <string name="search_hint">Search books, electronics, stationery…</string>
+    <string name="categories_title">Categories</string>
+    <string name="recently_listed_title">Recently Listed</string>
+    <string name="recommended_title">Recommended for You</string>
+    <string name="see_all">See all</string>
+    <string name="rupee_symbol">₹</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_favourites">Saved</string>
+    <string name="nav_sell">Sell</string>
+    <string name="nav_chats">Chats</string>
+    <string name="nav_profile">Profile</string>
+
+    <!-- State Messages -->
+    <string name="empty_products_title">No listings found</string>
+    <string name="empty_products_desc">Be the first student to post a listing in this category!</string>
+    <string name="action_retry">Refresh</string>
+    <string name="action_clear_filter">Clear Filter</string>
+    <string name="loading_products">Loading campus listings…</string>
+
+    <!-- Placeholders for modular nav -->
+    <string name="feature_coming_soon">%1$s feature will be active in upcoming phase</string>
+</resources>

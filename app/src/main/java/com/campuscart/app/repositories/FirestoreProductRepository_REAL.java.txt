@@ -1,0 +1,360 @@
+// FirestoreProductRepository — REAL IMPLEMENTATION
+// ════════════════════════════════════════════════
+// This file contains the full Cloud Firestore implementation of ProductRepository.
+// It is stored as a .txt file so the project compiles without Firebase on the classpath.
+//
+// ACTIVATION STEPS:
+//   1. Complete the Firebase setup checklist in FirestoreProductRepository.java
+//   2. Rename this file to FirestoreProductRepository.java (overwriting the stub)
+//   3. Ensure Firebase SDK is on the classpath (see build.gradle.kts instructions)
+//   4. Call ProductRepositoryProvider.setRepository(FirestoreProductRepository.getInstance())
+//      in your Application class or HomeActivity.onCreate()
+//
+// ════════════════════════════════════════════════
+
+package com.campuscart.app.repositories;
+
+import android.util.Log;
+
+import com.campuscart.app.models.Product;
+import com.google.firebase.Timestamp;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.DocumentSnapshot;
+import com.google.firebase.firestore.FieldValue;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.Query;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Cloud Firestore implementation of ProductRepository.
+ *
+ * All writes tie the listing's sellerId to the authenticated user's UID.
+ * Ownership is enforced at both the application layer (AuthHelper.getCurrentUserId())
+ * and the database layer (firestore.rules).
+ *
+ * Firestore document schema (products collection):
+ *   productId   — String (document ID, also stored as field for queries)
+ *   title       — String
+ *   description — String
+ *   price       — Double (INR, e.g. 420.0)
+ *   category    — String (one of 8 marketplace categories)
+ *   condition   — String (Brand New | Like New | Good | Fair)
+ *   imageUrls   — List<String> (HTTPS URLs on Cloudinary)
+ *   sellerId    — String (Firebase Authentication UID)
+ *   sellerName  — String
+ *   createdAt   — Timestamp (server timestamp on create, never overwritten)
+ *   updatedAt   — Timestamp (server timestamp on every write)
+ *   isSold      — Boolean
+ */
+public class FirestoreProductRepository implements ProductRepository {
+
+    private static final String TAG = "FirestoreProductRepo";
+    private static volatile FirestoreProductRepository instance;
+    private final FirebaseFirestore db;
+
+    private FirestoreProductRepository() {
+        db = FirebaseFirestore.getInstance();
+    }
+
+    public static synchronized FirestoreProductRepository getInstance() {
+        if (instance == null) {
+            instance = new FirestoreProductRepository();
+        }
+        return instance;
+    }
+
+    // ── CREATE ──────────────────────────────────────────────────────────────────
+
+    /**
+     * Saves a new product to the `products` Firestore collection.
+     * A new document reference ID is generated as the productId.
+     * Server timestamps are used for createdAt and updatedAt.
+     */
+    @Override
+    public void createProduct(Product product, Callback<Product> callback) {
+        if (product == null) {
+            if (callback != null) callback.onError("Product cannot be null");
+            return;
+        }
+
+        DocumentReference docRef = db.collection(FirestoreConfig.COLLECTION_PRODUCTS).document();
+        String generatedId = docRef.getId();
+        product.setProductId(generatedId);
+
+        Map<String, Object> data = productToMap(product);
+        data.put(FirestoreConfig.FIELD_CREATED_AT, FieldValue.serverTimestamp());
+        data.put(FirestoreConfig.FIELD_UPDATED_AT, FieldValue.serverTimestamp());
+
+        docRef.set(data)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Product created: " + generatedId);
+                    if (callback != null) callback.onSuccess(product);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to create product", e);
+                    if (callback != null) callback.onError(e.getMessage());
+                });
+    }
+
+    // ── READ: All available ─────────────────────────────────────────────────────
+
+    /**
+     * Retrieves all products where isSold == false, ordered by createdAt descending.
+     */
+    @Override
+    public void getAvailableProducts(Callback<List<Product>> callback) {
+        db.collection(FirestoreConfig.COLLECTION_PRODUCTS)
+                .whereEqualTo(FirestoreConfig.FIELD_IS_SOLD, false)
+                .orderBy(FirestoreConfig.FIELD_CREATED_AT, Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    List<Product> products = new ArrayList<>();
+                    for (QueryDocumentSnapshot doc : querySnapshot) {
+                        Product p = documentToProduct(doc);
+                        if (p != null) products.add(p);
+                    }
+                    Log.d(TAG, "Fetched " + products.size() + " available products");
+                    if (callback != null) callback.onSuccess(products);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "getAvailableProducts failed", e);
+                    if (callback != null) callback.onError(e.getMessage());
+                });
+    }
+
+    // ── READ: By Seller ────────────────────────────────────────────────────────
+
+    /**
+     * Retrieves all listings (available + sold) by a specific seller, newest first.
+     * Used by MyListingsActivity.
+     */
+    @Override
+    public void getProductsBySeller(String sellerId, Callback<List<Product>> callback) {
+        if (sellerId == null || sellerId.trim().isEmpty()) {
+            if (callback != null) callback.onError("Invalid seller ID");
+            return;
+        }
+
+        db.collection(FirestoreConfig.COLLECTION_PRODUCTS)
+                .whereEqualTo(FirestoreConfig.FIELD_SELLER_ID, sellerId)
+                .orderBy(FirestoreConfig.FIELD_CREATED_AT, Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    List<Product> products = new ArrayList<>();
+                    for (QueryDocumentSnapshot doc : querySnapshot) {
+                        Product p = documentToProduct(doc);
+                        if (p != null) products.add(p);
+                    }
+                    Log.d(TAG, "Fetched " + products.size() + " listings for seller: " + sellerId);
+                    if (callback != null) callback.onSuccess(products);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "getProductsBySeller failed for: " + sellerId, e);
+                    if (callback != null) callback.onError(e.getMessage());
+                });
+    }
+
+    // ── READ: By ID ─────────────────────────────────────────────────────────────
+
+    @Override
+    public void getProductById(String productId, Callback<Product> callback) {
+        if (productId == null || productId.trim().isEmpty()) {
+            if (callback != null) callback.onError("Invalid product ID");
+            return;
+        }
+
+        db.collection(FirestoreConfig.COLLECTION_PRODUCTS)
+                .document(productId)
+                .get()
+                .addOnSuccessListener(doc -> {
+                    if (doc.exists()) {
+                        Product p = documentToProduct(doc);
+                        if (p != null) {
+                            if (callback != null) callback.onSuccess(p);
+                        } else {
+                            if (callback != null) callback.onError("Failed to parse product");
+                        }
+                    } else {
+                        if (callback != null) callback.onError("Product not found");
+                    }
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "getProductById failed: " + productId, e);
+                    if (callback != null) callback.onError(e.getMessage());
+                });
+    }
+
+    // ── UPDATE ──────────────────────────────────────────────────────────────────
+
+    /**
+     * Updates mutable fields of a product.
+     * sellerId and createdAt are immutable — excluded here and enforced by firestore.rules.
+     */
+    @Override
+    public void updateProduct(Product updated, Callback<Void> callback) {
+        if (updated == null || updated.getProductId() == null) {
+            if (callback != null) callback.onError("Invalid product for update");
+            return;
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put(FirestoreConfig.FIELD_TITLE, updated.getTitle());
+        data.put(FirestoreConfig.FIELD_DESCRIPTION, updated.getDescription());
+        data.put(FirestoreConfig.FIELD_PRICE, updated.getPrice());
+        data.put(FirestoreConfig.FIELD_CATEGORY, updated.getCategory());
+        data.put(FirestoreConfig.FIELD_CONDITION, updated.getCondition());
+        data.put(FirestoreConfig.FIELD_IMAGE_URLS, updated.getImageUrls());
+        data.put(FirestoreConfig.FIELD_IS_SOLD, updated.isSold());
+        data.put(FirestoreConfig.FIELD_UPDATED_AT, FieldValue.serverTimestamp());
+
+        db.collection(FirestoreConfig.COLLECTION_PRODUCTS)
+                .document(updated.getProductId())
+                .update(data)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Product updated: " + updated.getProductId());
+                    if (callback != null) callback.onSuccess(null);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "updateProduct failed: " + updated.getProductId(), e);
+                    if (callback != null) callback.onError(e.getMessage());
+                });
+    }
+
+    // ── DELETE ──────────────────────────────────────────────────────────────────
+
+    /**
+     * Permanently deletes a product document.
+     * firestore.rules enforces that only the owner (sellerId == auth.uid) can delete.
+     */
+    @Override
+    public void deleteProduct(String productId, Callback<Void> callback) {
+        if (productId == null || productId.trim().isEmpty()) {
+            if (callback != null) callback.onError("Invalid product ID");
+            return;
+        }
+
+        db.collection(FirestoreConfig.COLLECTION_PRODUCTS)
+                .document(productId)
+                .delete()
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Product deleted: " + productId);
+                    if (callback != null) callback.onSuccess(null);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "deleteProduct failed: " + productId, e);
+                    if (callback != null) callback.onError(e.getMessage());
+                });
+    }
+
+    // ── MARK AS SOLD / AVAILABLE ───────────────────────────────────────────────
+
+    @Override
+    public void markAsSold(String productId, Callback<Void> callback) {
+        setSoldStatus(productId, true, callback);
+    }
+
+    @Override
+    public void markAsAvailable(String productId, Callback<Void> callback) {
+        setSoldStatus(productId, false, callback);
+    }
+
+    private void setSoldStatus(String productId, boolean isSold, Callback<Void> callback) {
+        if (productId == null || productId.trim().isEmpty()) {
+            if (callback != null) callback.onError("Invalid product ID");
+            return;
+        }
+
+        Map<String, Object> data = new HashMap<>();
+        data.put(FirestoreConfig.FIELD_IS_SOLD, isSold);
+        data.put(FirestoreConfig.FIELD_UPDATED_AT, FieldValue.serverTimestamp());
+
+        db.collection(FirestoreConfig.COLLECTION_PRODUCTS)
+                .document(productId)
+                .update(data)
+                .addOnSuccessListener(aVoid -> {
+                    Log.d(TAG, "Sold status -> " + isSold + " for: " + productId);
+                    if (callback != null) callback.onSuccess(null);
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "setSoldStatus failed for: " + productId, e);
+                    if (callback != null) callback.onError(e.getMessage());
+                });
+    }
+
+    // ── Serialisation helpers ───────────────────────────────────────────────────
+
+    private Map<String, Object> productToMap(Product p) {
+        Map<String, Object> map = new HashMap<>();
+        map.put(FirestoreConfig.FIELD_PRODUCT_ID, p.getProductId());
+        map.put(FirestoreConfig.FIELD_TITLE, p.getTitle());
+        map.put(FirestoreConfig.FIELD_DESCRIPTION, p.getDescription());
+        map.put(FirestoreConfig.FIELD_PRICE, p.getPrice());
+        map.put(FirestoreConfig.FIELD_CATEGORY, p.getCategory());
+        map.put(FirestoreConfig.FIELD_CONDITION, p.getCondition());
+        map.put(FirestoreConfig.FIELD_IMAGE_URLS, p.getImageUrls());
+        map.put(FirestoreConfig.FIELD_SELLER_ID, p.getSellerId());
+        map.put(FirestoreConfig.FIELD_SELLER_NAME, p.getSellerName());
+        map.put(FirestoreConfig.FIELD_IS_SOLD, p.isSold());
+        return map;
+    }
+
+    /**
+     * Converts a Firestore DocumentSnapshot to a Product POJO.
+     * Handles both Timestamp and Long for createdAt/updatedAt to ensure
+     * compatibility when migrating from InMemoryProductRepository test data.
+     *
+     * Returns null if the document cannot be deserialized.
+     */
+    private Product documentToProduct(DocumentSnapshot doc) {
+        try {
+            Product p = new Product();
+            p.setProductId(doc.getId());
+            p.setTitle(doc.getString(FirestoreConfig.FIELD_TITLE));
+            p.setDescription(doc.getString(FirestoreConfig.FIELD_DESCRIPTION));
+
+            Double price = doc.getDouble(FirestoreConfig.FIELD_PRICE);
+            p.setPrice(price != null ? price : 0.0);
+
+            p.setCategory(doc.getString(FirestoreConfig.FIELD_CATEGORY));
+            p.setCondition(doc.getString(FirestoreConfig.FIELD_CONDITION));
+            p.setSellerId(doc.getString(FirestoreConfig.FIELD_SELLER_ID));
+            p.setSellerName(doc.getString(FirestoreConfig.FIELD_SELLER_NAME));
+
+            Boolean isSold = doc.getBoolean(FirestoreConfig.FIELD_IS_SOLD);
+            p.setSold(isSold != null && isSold);
+
+            Object createdAtRaw = doc.get(FirestoreConfig.FIELD_CREATED_AT);
+            if (createdAtRaw instanceof Timestamp) {
+                p.setCreatedAt(((Timestamp) createdAtRaw).toDate().getTime());
+            } else if (createdAtRaw instanceof Long) {
+                p.setCreatedAt((Long) createdAtRaw);
+            }
+
+            Object updatedAtRaw = doc.get(FirestoreConfig.FIELD_UPDATED_AT);
+            if (updatedAtRaw instanceof Timestamp) {
+                p.setUpdatedAt(((Timestamp) updatedAtRaw).toDate().getTime());
+            } else if (updatedAtRaw instanceof Long) {
+                p.setUpdatedAt((Long) updatedAtRaw);
+            }
+
+            List<?> rawUrls = (List<?>) doc.get(FirestoreConfig.FIELD_IMAGE_URLS);
+            List<String> imageUrls = new ArrayList<>();
+            if (rawUrls != null) {
+                for (Object url : rawUrls) {
+                    if (url instanceof String) imageUrls.add((String) url);
+                }
+            }
+            p.setImageUrls(imageUrls);
+
+            return p;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to deserialize document: " + doc.getId(), e);
+            return null;
+        }
+    }
+}

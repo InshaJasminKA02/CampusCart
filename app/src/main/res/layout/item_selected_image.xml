@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="88dp"
+    android:layout_height="88dp"
+    android:layout_marginEnd="10dp"
+    app:cardBackgroundColor="@color/lavender_soft"
+    app:cardCornerRadius="14dp"
+    app:cardElevation="1dp"
+    app:strokeColor="@color/lavender_border"
+    app:strokeWidth="1dp">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:id="@+id/ivSelectedThumbnail"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="Selected Photo"
+            android:scaleType="centerCrop"
+            tools:src="@drawable/ic_placeholder_image" />
+
+        <!-- Remove Photo Action -->
+        <ImageButton
+            android:id="@+id/btnRemoveImage"
+            android:layout_width="26dp"
+            android:layout_height="26dp"
+            android:layout_gravity="top|end"
+            android:layout_margin="4dp"
+            android:background="@drawable/bg_remove_button"
+            android:contentDescription="Remove photo"
+            android:padding="5dp"
+            android:src="@drawable/ic_close" />
+
+        <!-- Primary Badge on first photo -->
+        <TextView
+            android:id="@+id/tvPrimaryBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="4dp"
+            android:background="@drawable/bg_badge_condition"
+            android:paddingStart="6dp"
+            android:paddingTop="2dp"
+            android:paddingEnd="6dp"
+            android:paddingBottom="2dp"
+            android:text="Cover"
+            android:textColor="@color/primary_purple"
+            android:textSize="9sp"
+            android:textStyle="bold"
+            android:visibility="gone"
+            tools:visibility="visible" />
+    </FrameLayout>
+
+</com.google.android.material.card.MaterialCardView>

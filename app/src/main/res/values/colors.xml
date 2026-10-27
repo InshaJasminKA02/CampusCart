@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand Purple Colors -->
+    <color name="primary_purple">#4C1D95</color>
+    <color name="primary_purple_dark">#2E1065</color>
+    <color name="primary_purple_light">#6D28D9</color>
+    <color name="purple_accent">#7C3AED</color>
+    <color name="lavender_soft">#EDE9FE</color>
+    <color name="lavender_border">#DDD6FE</color>
+    <color name="lavender_bg">#F7F5FC</color>
+
+    <!-- Surfaces & Neutrals -->
+    <color name="white">#FFFFFF</color>
+    <color name="surface_card">#FFFFFF</color>
+    <color name="text_primary">#1E1B4B</color>
+    <color name="text_secondary">#6B7280</color>
+    <color name="text_muted">#9CA3AF</color>
+    <color name="divider_line">#E9D5FF</color>
+    <color name="search_bg">#FFFFFF</color>
+
+    <!-- Status & Badges -->
+    <color name="price_green">#059669</color>
+    <color name="price_green_light">#ECFDF5</color>
+    <color name="badge_brand_new_bg">#DCFCE7</color>
+    <color name="badge_brand_new_text">#15803D</color>
+    <color name="badge_like_new_bg">#E0E7FF</color>
+    <color name="badge_like_new_text">#3730A3</color>
+    <color name="badge_good_bg">#FEF3C7</color>
+    <color name="badge_good_text">#B45309</color>
+    <color name="badge_fair_bg">#FEE2E2</color>
+    <color name="badge_fair_text">#B91C1C</color>
+    <color name="badge_available_bg">#DCFCE7</color>
+    <color name="badge_available_text">#15803D</color>
+    <color name="badge_sold_bg">#F3F4F6</color>
+    <color name="badge_sold_text">#4B5563</color>
+
+    <!-- Actions & Highlights -->
+    <color name="heart_active">#E11D48</color>
+    <color name="heart_inactive">#9CA3AF</color>
+    <color name="bottom_nav_selected">#4C1D95</color>
+    <color name="bottom_nav_unselected">#9CA3AF</color>
+</resources>

@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isListingOwner(resource) {
+      return isAuthenticated() && resource.data.sellerId == request.auth.uid;
+    }
+
+    // 1. PRODUCTS COLLECTION
+    match /products/{productId} {
+      // Anyone can browse listings (including guest preview)
+      allow read: if true;
+
+      // Only authenticated users can create listings, and sellerId must match their auth UID
+      allow create: if isAuthenticated()
+        && request.resource.data.sellerId == request.auth.uid
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 3
+        && request.resource.data.title.size() <= 100
+        && request.resource.data.price is number
+        && request.resource.data.price > 0
+        && request.resource.data.category is string
+        && request.resource.data.condition is string
+        && request.resource.data.isSold is bool
+        && request.resource.data.imageUrls is list;
+
+      // Only the listing owner can update their product
+      // Prevent changing sellerId or original createdAt timestamp
+      allow update: if isListingOwner(resource)
+        && request.resource.data.sellerId == resource.data.sellerId
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.title is string
+        && request.resource.data.title.size() >= 3
+        && request.resource.data.price is number
+        && request.resource.data.price > 0;
+
+      // Only the listing owner can delete their product
+      allow delete: if isListingOwner(resource);
+    }
+
+    // 2. FAVOURITES COLLECTION
+    // Each user has their own document or subcollection keyed by UID
+    match /favourites/{userId} {
+      allow read, write: if isOwner(userId);
+      match /savedItems/{productId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // 3. CONVERSATIONS & CHAT MESSAGES
+    match /conversations/{conversationId} {
+      // Only conversation participants (buyer or seller) can access
+      allow read: if isAuthenticated() &&
+        (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId);
+
+      allow create: if isAuthenticated() &&
+        (request.auth.uid == request.resource.data.buyerId || request.auth.uid == request.resource.data.sellerId);
+
+      allow update: if isAuthenticated() &&
+        (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId);
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() &&
+          (request.auth.uid == get(/databases/$(database)/documents/conversations/$(conversationId)).data.buyerId ||
+           request.auth.uid == get(/databases/$(database)/documents/conversations/$(conversationId)).data.sellerId);
+
+        allow create: if isAuthenticated() &&
+          request.resource.data.senderId == request.auth.uid;
+      }
+    }
+
+    // 4. USERS COLLECTION
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow write: if isOwner(userId);
+    }
+  }
+}
